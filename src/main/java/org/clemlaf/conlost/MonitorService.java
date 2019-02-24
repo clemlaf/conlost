@@ -20,7 +20,6 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.SystemClock;
-import java.util.Arrays;
 import java.util.List;
 
 
@@ -37,6 +36,7 @@ public class MonitorService extends Service
     private int telephonyManagerEvents;
     private Boolean lastMobileNetworkConnected;
     private boolean mobileNetworkConnected;
+    //private Timer mytimer;
     public static final String ACTION_NOTIFICATION = "conlost.notif";
     public static final String TAG = "CONLOST";
     private static final String INTENT_ALARM_RESTART_SERVICE_DIED = "ALARM_RESTART_SERVICE_DIED";
@@ -90,6 +90,7 @@ public class MonitorService extends Service
             // http://stackoverflow.com/a/20735519/1527491
             ensureServiceStaysRunning();
 	    }*/
+	//mytimer = new Timer();
 
     }
 
@@ -101,6 +102,7 @@ public class MonitorService extends Service
 
         tm = null;
 
+	//mytimer.cancel();
         // Remove the status bar notification.
         stopForeground(true);
     }
@@ -210,12 +212,27 @@ public class MonitorService extends Service
         final int notificationPriority = NotificationCompat.PRIORITY_LOW;
         final PendingIntent contentIntent = openUIPendingIntent;
 
-        if (mobileNetworkConnected) { // Not Free Mobile nor Orange
+        if (mobileNetworkConnected) { // Connected to network
 	     tickerText = getString(R.string.connected);
 	     smallIcon = android.R.drawable.checkbox_on_background;
-      	} else { // Foreign operator
+	     //mytimer.cancel();
+      	} else { // not connected
 	    tickerText = getString(R.string.connection_lost);
             smallIcon = android.R.drawable.stat_sys_warning;
+	    // update Notification every 'time' seconds
+	    long time = 15*60;
+	    if (BuildConfig.DEBUG){
+		time = 10;
+	    }
+	    Handler mytimer = new Handler()
+		{
+		    @Override
+		    public void handleMessage(Message msg) {
+			// Create a pending intent
+			updateNotification(true, false);
+		    }            
+		};
+	    mytimer.sendEmptyMessageDelayed(0, time*1000); 
 	}
 
         final NotificationCompat.Builder nBuilder = new NotificationCompat.Builder(getApplicationContext());
@@ -234,6 +251,9 @@ public class MonitorService extends Service
                 nBuilder.setSound(soundUri);
             }
         }
+	if(!mobileNetworkConnected){
+	    nBuilder.setLights(0xffff0000,500,1000);
+	}
 
         startForeground(R.string.stat_connected, nBuilder.build());
     }

@@ -21,6 +21,8 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.SystemClock;
 import java.util.List;
+import java.text.DateFormat;
+import java.util.Date;
 
 
 /**
@@ -36,6 +38,8 @@ public class MonitorService extends Service
     private int telephonyManagerEvents;
     private Boolean lastMobileNetworkConnected;
     private boolean mobileNetworkConnected;
+    private DateFormat myDateFormat;
+    private Date lastUpdate;
     //private Timer mytimer;
     public static final String ACTION_NOTIFICATION = "conlost.notif";
     public static final String TAG = "CONLOST";
@@ -91,6 +95,8 @@ public class MonitorService extends Service
             ensureServiceStaysRunning();
 	    }*/
 	//mytimer = new Timer();
+	myDateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
+	lastUpdate = new Date();
 
     }
 
@@ -207,17 +213,19 @@ public class MonitorService extends Service
      * @param phoneStateUpdated if phone state has been updated
      */
 	private void updateNotification(boolean playSound, boolean phoneStateUpdated) {
-        String tickerText, contentText;
+        String tickerText;
 	int smallIcon;
         final int notificationPriority = NotificationCompat.PRIORITY_LOW;
         final PendingIntent contentIntent = openUIPendingIntent;
 
         if (mobileNetworkConnected) { // Connected to network
-	     tickerText = getString(R.string.connected);
+	    tickerText = String.format(getString(R.string.connected),
+				       myDateFormat.format(lastUpdate));
 	     smallIcon = android.R.drawable.checkbox_on_background;
 	     //mytimer.cancel();
       	} else { // not connected
-	    tickerText = getString(R.string.connection_lost);
+	    tickerText = String.format(getString(R.string.connection_lost),
+				       myDateFormat.format(lastUpdate));
             smallIcon = android.R.drawable.stat_sys_warning;
 	    // update Notification every 'time' seconds
 	    long time = 15*60;
@@ -273,8 +281,10 @@ public class MonitorService extends Service
         
 	int ret = 0;
         
-        if (lastMobileNetworkConnected != null && lastMobileNetworkConnected != mobileNetworkConnected)
+        if (lastMobileNetworkConnected != null && lastMobileNetworkConnected != mobileNetworkConnected){
         	ret = 1;
+		lastUpdate = new Date();
+	}
         
         lastMobileNetworkConnected = mobileNetworkConnected;
         

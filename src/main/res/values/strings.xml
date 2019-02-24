@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ConnLost</string>
+    <string name="service_monitor">MonitorService</string>
+    <string name="connected">Connecté</string>
+    <string name="connection_lost">Hors Réseau !</string>
+    <string name="stat_connected">État connexion</string>
+    <string name="my_button_text">Hello</string>
+</resources>

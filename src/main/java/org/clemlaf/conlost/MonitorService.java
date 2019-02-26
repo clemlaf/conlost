@@ -40,6 +40,9 @@ public class MonitorService extends Service
     private boolean mobileNetworkConnected;
     private DateFormat myDateFormat;
     private Date lastUpdate;
+    private long lastDisconnectedInterval;
+    private Handler mytimer;
+    private static final long delayNoSound = 1*60;
     //private Timer mytimer;
     public static final String ACTION_NOTIFICATION = "conlost.notif";
     public static final String TAG = "CONLOST";
@@ -97,6 +100,16 @@ public class MonitorService extends Service
 	//mytimer = new Timer();
 	myDateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
 	lastUpdate = new Date();
+	lastDisconnectedInterval = 0;
+	mytimer = new Handler()
+		{
+		    @Override
+		    public void handleMessage(Message msg) {
+			// Create a pending intent
+			int res = onPhoneStateUpdated();
+			updateNotification(true, res == 1);
+		    }            
+		};
 
     }
 
@@ -212,58 +225,60 @@ public class MonitorService extends Service
      * @param playSound play notification sound
      * @param phoneStateUpdated if phone state has been updated
      */
-	private void updateNotification(boolean playSound, boolean phoneStateUpdated) {
-        String tickerText;
+    private void updateNotification(boolean playSound, boolean phoneStateUpdated) {
+	String tickerText, contentText;
 	int smallIcon;
-        final int notificationPriority = NotificationCompat.PRIORITY_LOW;
-        final PendingIntent contentIntent = openUIPendingIntent;
+	final int notificationPriority = NotificationCompat.PRIORITY_LOW;
+	final PendingIntent contentIntent = openUIPendingIntent;
 
-        if (mobileNetworkConnected) { // Connected to network
+	contentText = String.format(getString(R.string.connected_content),
+				       formatDt(lastDisconnectedInterval));
+	if (mobileNetworkConnected) { // Connected to network
 	    tickerText = String.format(getString(R.string.connected),
 				       myDateFormat.format(lastUpdate));
-	     smallIcon = android.R.drawable.checkbox_on_background;
-	     //mytimer.cancel();
-      	} else { // not connected
+	    smallIcon = android.R.drawable.checkbox_on_background;
+	} else { // not connected
 	    tickerText = String.format(getString(R.string.connection_lost),
 				       myDateFormat.format(lastUpdate));
-            smallIcon = android.R.drawable.stat_sys_warning;
+	    smallIcon = android.R.drawable.stat_sys_warning;
 	    // update Notification every 'time' seconds
 	    long time = 15*60;
+	    if (lastDisconnectedInterval == 0)
+		time = delayNoSound;
 	    if (BuildConfig.DEBUG){
 		time = 10;
 	    }
-	    Handler mytimer = new Handler()
-		{
-		    @Override
-		    public void handleMessage(Message msg) {
-			// Create a pending intent
-			updateNotification(true, false);
-		    }            
-		};
-	    mytimer.sendEmptyMessageDelayed(0, time*1000); 
+	    if(!mytimer.hasMessages(0))
+		mytimer.sendEmptyMessageDelayed(0, time*1000); 
 	}
 
-        final NotificationCompat.Builder nBuilder = new NotificationCompat.Builder(getApplicationContext());
-        nBuilder.setSmallIcon(smallIcon)
-                .setContentTitle(tickerText).setTicker(tickerText)
-                .setContentIntent(contentIntent) // always set the content intent - exception fired on GB if null
-                .setPriority(notificationPriority)
-                .setWhen(0);
+	final NotificationCompat.Builder nBuilder = new NotificationCompat.Builder(getApplicationContext());
+	nBuilder.setSmallIcon(smallIcon)
+	    .setContentTitle(tickerText).setTicker(tickerText)
+	    .setContentText(contentText)
+	    .setContentIntent(contentIntent) // always set the content intent - exception fired on GB if null
+	    .setPriority(notificationPriority)
+	    .setWhen(0);
 
-        if (playSound) {
-            Log.d(TAG, "Play notification sound");
+	if (playSound) {
+	    Log.d(TAG, "Play notification sound");
 
 
-            if (phoneStateUpdated || !mobileNetworkConnected) {
+	    if ((phoneStateUpdated &&
+		 mobileNetworkConnected &&
+		 lastDisconnectedInterval > delayNoSound*1000 ) ||
+		(!mobileNetworkConnected
+		 && lastDisconnectedInterval > delayNoSound*999)) {
+		//Log(TAG,String.format("delay is %d > %d", lastDisconnectedInterval, delayNoSound*999));
 		Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-                nBuilder.setSound(soundUri);
-            }
-        }
+		nBuilder.setSound(soundUri);
+	    }
+	}
 	if(!mobileNetworkConnected){
 	    nBuilder.setLights(0xffff0000,500,1000);
 	}
 
-        startForeground(R.string.stat_connected, nBuilder.build());
+	startForeground(R.string.stat_connected, nBuilder.build());
     }
     
 
@@ -272,24 +287,38 @@ public class MonitorService extends Service
      * @return -1 : no update ; 0 : minor update ; 1 : major update
      * It is a major update if mobile operator changes or phone connects a network.
      */
-	private int onPhoneStateUpdated() {		
-        // Prevent duplicated inserts.
-        if (lastMobileNetworkConnected != null && 
-            lastMobileNetworkConnected.equals(mobileNetworkConnected)){
-            return -1;
-        }
-        
-	int ret = 0;
-        
-        if (lastMobileNetworkConnected != null && lastMobileNetworkConnected != mobileNetworkConnected){
-        	ret = 1;
-		lastUpdate = new Date();
+    private int onPhoneStateUpdated() {		
+	Date now = new Date();
+	// Prevent duplicated inserts.
+	if (lastMobileNetworkConnected != null && 
+	    lastMobileNetworkConnected.equals(mobileNetworkConnected)){
+	    if(!mobileNetworkConnected)
+		lastDisconnectedInterval = now.getTime() - lastUpdate.getTime();
+	    return -1;
 	}
-        
-        lastMobileNetworkConnected = mobileNetworkConnected;
-        
-        Log.i(TAG, "Phone state updated: connected=" + mobileNetworkConnected) ;
-        return ret;
+	
+	int ret = 0;
+	
+	if (lastMobileNetworkConnected != null &&
+	    lastMobileNetworkConnected != mobileNetworkConnected){
+	    ret = 1;
+	    if (mobileNetworkConnected)
+		lastDisconnectedInterval = now.getTime() - lastUpdate.getTime();
+	    else
+		lastDisconnectedInterval = 0;
+	    lastUpdate = now;
+	}
+	
+	lastMobileNetworkConnected = mobileNetworkConnected;
+	
+	Log.i(TAG, "Phone state updated: connected=" + mobileNetworkConnected) ;
+	return ret;
+    }
+    static private String formatDt(long val) {
+	long hours = val/3600000; val %= 3600000;
+	long minutes = val/60000; val %= 60000;
+	long seconds = (val/1000);
+	return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
 
 }

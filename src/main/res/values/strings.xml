@@ -3,6 +3,7 @@
     <string name="app_name">ConnLost</string>
     <string name="service_monitor">MonitorService</string>
     <string name="connected">Connecté depuis %s</string>
+    <string name="connected_content">Durée perte : %s</string>
     <string name="connection_lost">Hors Réseau depuis %s</string>
     <string name="stat_connected">État connexion</string>
     <string name="my_button_text">Quitter</string>

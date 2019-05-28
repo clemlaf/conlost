@@ -5,19 +5,44 @@ package org.clemlaf.conlost;
 
 import android.support.v4.app.FragmentActivity;
 import android.content.Context;
+import android.database.Cursor;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.ListView;
+import android.widget.CursorAdapter;
 import org.clemlaf.conlost.MonitorService;
+import org.clemlaf.conlost.Event;
+import org.clemlaf.conlost.ConlostContract.Events;
+import org.clemlaf.conlost.ConlostCursorAdapter;
 
-public class ConlostActivity extends FragmentActivity
+public class ConlostActivity extends FragmentActivity 
 {
+    private ConlostCursorAdapter listAdapt;
   @Override
   public void onCreate(Bundle savedInstanceState)
   {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.main);
     startService();
+    Cursor c = getApplicationContext().
+			   getContentResolver().
+			   query(
+				 Events.CONTENT_URI,
+				 new String[] { Events._ID, Events.TIMESTAMP,
+						Events.DISC_INTERVAL},
+				 null, null, Events.TIMESTAMP + " DESC");
+
+    listAdapt = new ConlostCursorAdapter(getApplicationContext(), c, true);
+    /*listAdapt.changeCursor(getApplicationContext().
+			   getContentResolver().
+			   query(
+				 Events.CONTENT_URI,
+				 new String[] { Events._ID, Events.TIMESTAMP,
+						Events.DISC_INTERVAL},
+						null, null, Events.TIMESTAMP + " ASC"));*/
+    ListView lv = (ListView) findViewById(R.id.my_list_view);
+    lv.setAdapter(listAdapt);
   }
   private void startService() {
     final Context c = getApplicationContext();

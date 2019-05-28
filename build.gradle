@@ -24,13 +24,13 @@ apply plugin: 'com.android.application'
 
 dependencies {
     // This dependency is found on compile classpath of this component and consumers.
-    compile 'com.android.support:support-v4:25.3.1'
+    compile 'com.android.support:support-v4:28.+'
 }
 
 
 android {
-	compileSdkVersion 25
-	buildToolsVersion "25.0.2"
+	compileSdkVersion 28
+	buildToolsVersion "28.0.3"
 
 	signingConfigs {
 		release {

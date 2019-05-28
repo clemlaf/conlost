@@ -7,6 +7,8 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.app.AlarmManager;
 import android.content.Intent;
+import android.content.ContentValues;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.telephony.TelephonyManager;
 import android.telephony.PhoneStateListener;
@@ -15,6 +17,8 @@ import android.telephony.CellInfo;
 import android.net.Uri;
 import android.media.RingtoneManager;
 import android.support.v4.app.NotificationCompat;
+import android.app.NotificationManager;
+import android.app.NotificationChannel;
 import android.util.Log;
 import android.os.Handler;
 import android.os.IBinder;
@@ -23,6 +27,8 @@ import android.os.SystemClock;
 import java.util.List;
 import java.text.DateFormat;
 import java.util.Date;
+
+import org.clemlaf.conlost.ConlostContract.Events;
 
 
 /**
@@ -41,11 +47,14 @@ public class MonitorService extends Service
     private DateFormat myDateFormat;
     private Date lastUpdate;
     private long lastDisconnectedInterval;
-    private Handler mytimer;
+    private PendingIntent pintent;
+    private AlarmManager alarmMgr;
     private static final long delayNoSound = 1*60;
-    //private Timer mytimer;
+    private static final long repeatInterval = 10*60;
     public static final String ACTION_NOTIFICATION = "conlost.notif";
     public static final String TAG = "CONLOST";
+    public static final String NOTIF_CHANNEL_ID_L = "org.clemlaf.conlost.low";
+    public static final String NOTIF_CHANNEL_ID_H = "org.clemlaf.conlost.high";
     private static final String INTENT_ALARM_RESTART_SERVICE_DIED = "ALARM_RESTART_SERVICE_DIED";
     public static final String INTENT_UPDATE_NOTIF_ON_LOCKSCREEN = "UPDATE_NOTIF_ON_LOCKSCREEN";
 
@@ -97,20 +106,26 @@ public class MonitorService extends Service
             // http://stackoverflow.com/a/20735519/1527491
             ensureServiceStaysRunning();
 	    }*/
-	//mytimer = new Timer();
 	myDateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
 	lastUpdate = new Date();
 	lastDisconnectedInterval = 0;
-	mytimer = new Handler()
-		{
-		    @Override
-		    public void handleMessage(Message msg) {
-			// Create a pending intent
-			int res = onPhoneStateUpdated();
-			updateNotification(true, res == 1);
-		    }            
-		};
+        alarmMgr = (AlarmManager)getSystemService(Context.ALARM_SERVICE);
+        final Intent restartIntent = new Intent(this, MonitorService.class);
+        pintent = PendingIntent.getService(getApplicationContext(), 0, restartIntent, 0);
+        //alarmMgr.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + restartAlarmInterval, pintent);
 
+	String channel_name = "Conlost Background service";
+	NotificationChannel chan_l = new NotificationChannel(NOTIF_CHANNEL_ID_L,
+							   channel_name,
+							   NotificationManager.IMPORTANCE_LOW);
+	NotificationChannel chan_h = new NotificationChannel(NOTIF_CHANNEL_ID_H,
+							   channel_name,
+							   NotificationManager.IMPORTANCE_HIGH);
+	chan_l.enableLights(true);
+	chan_h.enableLights(true);
+	NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+	manager.createNotificationChannel(chan_l);
+	manager.createNotificationChannel(chan_h);
     }
 
     @Override
@@ -121,7 +136,8 @@ public class MonitorService extends Service
 
         tm = null;
 
-	//mytimer.cancel();
+	alarmMgr.cancel(pintent);
+
         // Remove the status bar notification.
         stopForeground(true);
     }
@@ -134,7 +150,7 @@ public class MonitorService extends Service
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
-        if (intent != null) //we have intent to handle
+        /*if (intent != null) //we have intent to handle
         {
             if (intent.getBooleanExtra(INTENT_ALARM_RESTART_SERVICE_DIED, false)) { //intent to check service is alive
                 Log.d(TAG, "onStartCommand > after ALARM_RESTART_SERVICE_DIED [ Kitkat START_STICKY bug ]");
@@ -149,11 +165,10 @@ public class MonitorService extends Service
                 Log.d(TAG, "onStartCommand > update the notification on lockscreen (hide / show)");
                 updateNotification(false, false);
             }
-        }
+	    }*/
         
         // Update with current state.
-        onPhoneStateUpdated();
-        updateNotification(false, false);
+        updateNotification(true, onPhoneStateUpdated() == 1);
 
         return START_STICKY;
 	}
@@ -178,15 +193,15 @@ public class MonitorService extends Service
 
 	}*/
     
-    private boolean isRunning() {
+    /*private boolean isRunning() {
         ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
         for (RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE))
             if (MonitorService.class.getName().equals(service.service.getClassName()))
                 return true;
         return false;
-    }
+	}*/
     
-    private void ensureServiceStaysRunning() {
+    /*private void ensureServiceStaysRunning() {
         // KitKat appears to have (in some cases) forgotten how to honor START_STICKY
         // and if the service is killed, it doesn't restart.  On an emulator & AOSP device, it restarts...
         // on my CM device, it does not - WTF?  So, we'll make sure it gets back
@@ -218,7 +233,7 @@ public class MonitorService extends Service
             };
             restartServiceHandler.sendEmptyMessageDelayed(0, 0); 
         }
-    }
+	}*/
 
     /**
      * Update the status bar notification.
@@ -228,7 +243,7 @@ public class MonitorService extends Service
     private void updateNotification(boolean playSound, boolean phoneStateUpdated) {
 	String tickerText, contentText;
 	int smallIcon;
-	final int notificationPriority = NotificationCompat.PRIORITY_LOW;
+	final int notificationPriority = NotificationCompat.PRIORITY_HIGH;
 	final PendingIntent contentIntent = openUIPendingIntent;
 
 	contentText = String.format(getString(R.string.connected_content),
@@ -236,44 +251,55 @@ public class MonitorService extends Service
 	if (mobileNetworkConnected) { // Connected to network
 	    tickerText = String.format(getString(R.string.connected),
 				       myDateFormat.format(lastUpdate));
-	    smallIcon = android.R.drawable.checkbox_on_background;
+	    smallIcon = android.R.drawable.ic_menu_send;
 	} else { // not connected
 	    tickerText = String.format(getString(R.string.connection_lost),
 				       myDateFormat.format(lastUpdate));
 	    smallIcon = android.R.drawable.stat_sys_warning;
 	    // update Notification every 'time' seconds
-	    long time = 15*60;
-	    if (lastDisconnectedInterval == 0)
-		time = delayNoSound;
+	    long time = repeatInterval;
 	    if (BuildConfig.DEBUG){
-		time = 10;
+		time = 20;
 	    }
-	    if(!mytimer.hasMessages(0))
-		mytimer.sendEmptyMessageDelayed(0, time*1000); 
+	    if (lastDisconnectedInterval == 0){
+		time = delayNoSound;
+	        if (BuildConfig.DEBUG){
+		    time = 10;
+	        }
+	    }
+	    //if(alarmMgr.getNextAlarmClock() == null)
+            alarmMgr.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+		         SystemClock.elapsedRealtime() + time*1000, pintent);
+	    //if(!mytimer.hasMessages(0))
+	    //mytimer.sendEmptyMessageDelayed(0, time*1000); 
 	}
+	long mydelay = delayNoSound;
+	String def_ch_id = NOTIF_CHANNEL_ID_L;
+	if(BuildConfig.DEBUG){
+	    mydelay = 10;
+	}
+	if (playSound) {
+	    if ((phoneStateUpdated &&
+		 mobileNetworkConnected &&
+		 lastDisconnectedInterval > mydelay*1000 ) ||
+		(!mobileNetworkConnected
+		 && lastDisconnectedInterval >= mydelay*1000-1)) {
+	        Log.d(TAG, "Play notification sound");
+		def_ch_id = NOTIF_CHANNEL_ID_H;
+	    }
+	}
+       
+	Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
 
-	final NotificationCompat.Builder nBuilder = new NotificationCompat.Builder(getApplicationContext());
+	final NotificationCompat.Builder nBuilder = new NotificationCompat.Builder(getApplicationContext(), def_ch_id);
 	nBuilder.setSmallIcon(smallIcon)
 	    .setContentTitle(tickerText).setTicker(tickerText)
 	    .setContentText(contentText)
 	    .setContentIntent(contentIntent) // always set the content intent - exception fired on GB if null
 	    .setPriority(notificationPriority)
+	    .setSound(soundUri)
 	    .setWhen(0);
 
-	if (playSound) {
-	    Log.d(TAG, "Play notification sound");
-
-
-	    if ((phoneStateUpdated &&
-		 mobileNetworkConnected &&
-		 lastDisconnectedInterval > delayNoSound*1000 ) ||
-		(!mobileNetworkConnected
-		 && lastDisconnectedInterval > delayNoSound*999)) {
-		//Log(TAG,String.format("delay is %d > %d", lastDisconnectedInterval, delayNoSound*999));
-		Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-		nBuilder.setSound(soundUri);
-	    }
-	}
 	if(!mobileNetworkConnected){
 	    nBuilder.setLights(0xffff0000,500,1000);
 	}
@@ -290,6 +316,7 @@ public class MonitorService extends Service
     private int onPhoneStateUpdated() {		
 	Date now = new Date();
 	// Prevent duplicated inserts.
+	// pas de changement d'état
 	if (lastMobileNetworkConnected != null && 
 	    lastMobileNetworkConnected.equals(mobileNetworkConnected)){
 	    if(!mobileNetworkConnected)
@@ -299,12 +326,18 @@ public class MonitorService extends Service
 	
 	int ret = 0;
 	
+	// changement d'état
 	if (lastMobileNetworkConnected != null &&
 	    lastMobileNetworkConnected != mobileNetworkConnected){
 	    ret = 1;
-	    if (mobileNetworkConnected)
+	    if (mobileNetworkConnected){
+		// on passe de déconnecté à connecté
 		lastDisconnectedInterval = now.getTime() - lastUpdate.getTime();
+		if(lastDisconnectedInterval > 2000)
+	           updateEventDatabase();  
+	    }
 	    else
+		// on passe de connecté à déconnecté
 		lastDisconnectedInterval = 0;
 	    lastUpdate = now;
 	}
@@ -313,6 +346,18 @@ public class MonitorService extends Service
 	
 	Log.i(TAG, "Phone state updated: connected=" + mobileNetworkConnected) ;
 	return ret;
+    }
+    private void updateEventDatabase() {
+        final Event e = new Event();
+        e.timestamp = System.currentTimeMillis();
+	e.disconnectionInterval = lastDisconnectedInterval;
+	writeEvent(e);
+    }
+    private void writeEvent(Event e) {
+	final ContentValues cv = new ContentValues(2);
+	final ContentResolver cr = getApplicationContext().getContentResolver();
+	e.write(cv);
+	cr.insert(Events.CONTENT_URI, cv);
     }
     static private String formatDt(long val) {
 	long hours = val/3600000; val %= 3600000;

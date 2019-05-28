@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ConnLost</string>
+    <string name="app_name">Connection Lost</string>
     <string name="service_monitor">MonitorService</string>
     <string name="connected">Connecté depuis %s</string>
     <string name="connected_content">Durée perte : %s</string>

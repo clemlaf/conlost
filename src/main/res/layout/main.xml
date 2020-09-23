@@ -7,7 +7,7 @@
         <Button
             android:id="@+id/my_sync_button"
             android:layout_width="fill_parent"
-            android:layout_weight="1"
+            android:layout_weight="0"
             android:layout_height="wrap_content"
             android:text="@string/my_button_text"
 	    android:onClick="quitService"
@@ -16,6 +16,6 @@
             android:id="@+id/my_list_view"
             android:layout_width="fill_parent"
             android:layout_weight="1"
-            android:layout_height="fill_parent"
+            android:layout_height="0dp"
 	    />
 </LinearLayout>

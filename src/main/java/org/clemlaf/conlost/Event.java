@@ -3,7 +3,8 @@ package org.clemlaf.conlost;
 import android.content.ContentValues;
 import android.database.Cursor;
 import java.util.Date;
-import java.text.SimpleDateFormat;
+import java.util.Locale;
+import java.text.DateFormat;
 
 import org.clemlaf.conlost.ConlostContract.Events;
 
@@ -30,7 +31,7 @@ public class Event{
 
     public String getDate(){
 	Date d = new Date(timestamp);
-	SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+	DateFormat format = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.LONG);
         return format.format(d);
     }
 
@@ -39,7 +40,7 @@ public class Event{
 	long hours = val/3600000; val %= 3600000;
 	long minutes = val/60000; val %= 60000;
 	long seconds = (val/1000);
-	return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+	return String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds);
     }
 
     @Override

@@ -21,7 +21,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 
-import static org.clemlaf.conlost.MonitorService.ACTION_NOTIFICATION;
 import static org.clemlaf.conlost.MonitorService.TAG;
 
 /**
@@ -30,22 +29,19 @@ import static org.clemlaf.conlost.MonitorService.TAG;
  */
 public class NotificationHandler extends BroadcastReceiver {
 
-    private static final String TAG = "NotificationHandler";
+    private static final String TAG = "Conlost.NotificationHandler";
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (ACTION_NOTIFICATION.equals(intent.getAction())) {
-            final Intent i = new Intent(context, ConlostActivity.class).setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            if (i != null) {
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                try {
-                    context.startActivity(i);
-                } catch(ActivityNotFoundException e) {
-                    Log.w(TAG, "Activity not found for notification action", e);
-                }
-            } else {
-                Log.e(TAG, "Cannot handle notification action");
-            }
-        }
+	Log.d(TAG, "Was here !");
+	final Intent i = new Intent(context, ConlostActivity.class).setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+	if (i != null) {
+	    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+	    try {
+		context.startActivity(i);
+	    } catch(ActivityNotFoundException e) {
+		Log.w(TAG, "Activity not found for notification action", e);
+	    }
+	}
     }
 }

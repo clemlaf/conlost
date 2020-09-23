@@ -27,8 +27,10 @@ import android.os.SystemClock;
 import java.util.List;
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 import org.clemlaf.conlost.ConlostContract.Events;
+import org.clemlaf.conlost.NotificationHandler;
 
 
 /**
@@ -51,7 +53,6 @@ public class MonitorService extends Service
     private AlarmManager alarmMgr;
     private static final long delayNoSound = 1*60;
     private static final long repeatInterval = 10*60;
-    public static final String ACTION_NOTIFICATION = "conlost.notif";
     public static final String TAG = "CONLOST";
     public static final String NOTIF_CHANNEL_ID_L = "org.clemlaf.conlost.low";
     public static final String NOTIF_CHANNEL_ID_H = "org.clemlaf.conlost.high";
@@ -63,9 +64,10 @@ public class MonitorService extends Service
         super.onCreate();
 
         tm = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-        
+
+	Context context = getApplicationContext();
         // This intent is fired when the application notification is clicked.
-        openUIPendingIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_NOTIFICATION), PendingIntent.FLAG_CANCEL_CURRENT);
+        openUIPendingIntent = PendingIntent.getBroadcast(context, 0, new Intent(context, NotificationHandler.class), PendingIntent.FLAG_CANCEL_CURRENT);
 
         // Watch mobile connections.
         phoneMonitor = new PhoneStateListener() {
@@ -95,8 +97,6 @@ public class MonitorService extends Service
         };
         telephonyManagerEvents = PhoneStateListener.LISTEN_SERVICE_STATE |
                                  PhoneStateListener.LISTEN_DATA_CONNECTION_STATE;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1)
-            telephonyManagerEvents |= PhoneStateListener.LISTEN_CELL_INFO;
 
         tm.listen(phoneMonitor, telephonyManagerEvents);
 
@@ -363,7 +363,7 @@ public class MonitorService extends Service
 	long hours = val/3600000; val %= 3600000;
 	long minutes = val/60000; val %= 60000;
 	long seconds = (val/1000);
-	return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+	return String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds);
     }
 
 }
